@@ -1,0 +1,30 @@
+{
+	"schemaVersion": 1,
+	"id": "deepstash",
+	"version": "${version}",
+	"name": "ExcaMate",
+	"description": "A compact mining companion that stashes drops directly into your inventory and clears connected stone, ore, and wood veins while its keybinding is held.",
+	"authors": [
+		"Skelly"
+	],
+	"license": "CC0-1.0",
+	"icon": "assets/deepstash/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.skelly.deepstash.ExcaMate"
+		],
+		"client": [
+			"com.skelly.deepstash.client.ExcaMateClient"
+		]
+	},
+	"mixins": [
+		"deepstash.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.2",
+		"minecraft": "~26.1.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

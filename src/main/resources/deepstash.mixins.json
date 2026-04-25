@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"package": "com.skelly.deepstash.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"BlockXpMixin",
+		"ServerPlayerGameModeMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
