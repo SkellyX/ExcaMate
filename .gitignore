@@ -1,40 +1,48 @@
-# gradle
+# Compiled class file
+*.class
 
+# Log files
+*.log
+hs_err_*.log
+replay_*.log
+
+# BlueJ files
+*.ctxt
+
+# Temp / misc
+.mtj.tmp/
+*.DS_Store
+
+# Archives (optional)
+*.zip
+*.tar.gz
+*.rar
+
+# Gradle
 .gradle/
 build/
 out/
 classes/
 
-# eclipse
+# Fabric run directory
+run/
 
+# IDEs
+# Eclipse
 *.launch
+.classpath
+.project
 
-# idea
-
+# IntelliJ
 .idea/
 *.iml
 *.ipr
 *.iws
 
-# vscode
-
-.settings/
+# VS Code
 .vscode/
+.settings/
 bin/
-.classpath
-.project
 
-# macos
-
-*.DS_Store
-
-# fabric
-
-run/
-
-# java
-
-hs_err_*.log
-replay_*.log
-*.hprof
-*.jfr
+# Local config
+local.properties
