@@ -18,7 +18,7 @@ loom {
 	splitEnvironmentSourceSets()
 
 	mods {
-		"deepstash" {
+		"excamate" {
 			sourceSet sourceSets.main
 			sourceSet sourceSets.client
 		}

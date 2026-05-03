@@ -11,8 +11,8 @@ import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 public class ExcaMateClient implements ClientModInitializer {
-    private static final String VEIN_MINE_KEY_TRANSLATION = "key.deepstash.vein_mine";
-    private static final String CYCLE_MODE_KEY_TRANSLATION = "key.deepstash.cycle_mode";
+    private static final String VEIN_MINE_KEY_TRANSLATION = "key.excamate.vein_mine";
+    private static final String CYCLE_MODE_KEY_TRANSLATION = "key.excamate.cycle_mode";
     private static final int DEFAULT_VEIN_MINE_KEY = GLFW.GLFW_KEY_V;
     private static final int DEFAULT_CYCLE_MODE_KEY = GLFW.GLFW_KEY_B;
 

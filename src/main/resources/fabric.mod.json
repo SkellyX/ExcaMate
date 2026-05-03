@@ -1,14 +1,14 @@
 {
 	"schemaVersion": 1,
-	"id": "deepstash",
+	"id": "excamate",
 	"version": "${version}",
 	"name": "ExcaMate",
-	"description": "A compact mining companion that stashes drops directly into your inventory and clears connected stone, ore, and wood veins while its keybinding is held.",
+	"description": "A mining companion that improves efficiency with multiple mining modes - with auto-collection of drops and XP",
 	"authors": [
-		"Skelly"
+		"SkellyX"
 	],
 	"license": "CC0-1.0",
-	"icon": "assets/deepstash/icon.png",
+	"icon": "assets/excamate/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
@@ -19,7 +19,7 @@
 		]
 	},
 	"mixins": [
-		"deepstash.mixins.json"
+		"excamate.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.19.2",
