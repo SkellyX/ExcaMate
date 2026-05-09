@@ -1,5 +1,6 @@
 package com.skelly.deepstash;
 
+import com.skelly.deepstash.config.ExcaMateConfig;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.BlockTags;
@@ -88,6 +89,24 @@ public final class ExcaMateMiningRules {
         return isPickaxeMineableBlock(state) || isOreBlock(state) || isSoilBlock(state) || isWoodBlock(state);
     }
 
+    public static boolean isDefaultSupportedBlock(@NotNull BlockState state) {
+        return isVeinMineableBlock(state) && state.getBlock() != Blocks.ANCIENT_DEBRIS;
+    }
+
+    public static boolean canMineWithExcaMate(
+        @NotNull Player player,
+        @NotNull BlockState state,
+        @NotNull ExcaMateConfig config
+    ) {
+        Block block = state.getBlock();
+        if (config.isVeinMineBlockBlocked(block)) return false;
+        boolean defaultSupported = isDefaultSupportedBlock(state);
+        boolean extraSupported = config.isExtraVeinMineBlockAllowed(block);
+        if (!defaultSupported && !extraSupported) return false;
+
+        return canUseCorrectToolForBlock(player, state);
+    }
+
     public static boolean isWoodBlock(@NotNull BlockState state) {
         return isTagged(state, BlockTags.LOGS) || WOOD_BLOCKS.contains(state.getBlock());
     }
@@ -106,14 +125,24 @@ public final class ExcaMateMiningRules {
         return isOreBlock(first) && first.getBlock() == second.getBlock();
     }
 
-    public static boolean canUseCorrectTool(@NotNull Player player, @NotNull BlockState state) {
+    public static boolean canUseCorrectToolForBlock(@NotNull Player player, @NotNull BlockState state) {
         ItemStack heldItem = player.getMainHandItem();
         if (heldItem.isEmpty()) return false;
 
-        if (isWoodBlock(state)) return heldItem.is(ItemTags.AXES);
-        if (isSoilBlock(state)) return heldItem.is(ItemTags.SHOVELS);
-        if (isOreBlock(state) || isPickaxeMineableBlock(state)) {
-            return heldItem.is(ItemTags.PICKAXES) && heldItem.isCorrectToolForDrops(state);
+        if (isPickaxeMineableBlock(state) || isOreBlock(state)) {
+            if (heldItem.is(ItemTags.PICKAXES) && heldItem.isCorrectToolForDrops(state)) return true;
+        }
+
+        if (isAxeMineableBlock(state) || isWoodBlock(state)) {
+            if (heldItem.is(ItemTags.AXES) && heldItem.isCorrectToolForDrops(state)) return true;
+        }
+
+        if (isSoilBlock(state)) {
+            if (heldItem.is(ItemTags.SHOVELS) && heldItem.isCorrectToolForDrops(state)) return true;
+        }
+
+        if (isHoeMineableBlock(state)) {
+            if (heldItem.is(ItemTags.HOES) && heldItem.isCorrectToolForDrops(state)) return true;
         }
 
         return false;
@@ -125,6 +154,14 @@ public final class ExcaMateMiningRules {
 
     private static boolean isSoilBlock(@NotNull BlockState state) {
         return isTagged(state, BlockTags.MINEABLE_WITH_SHOVEL) || SOIL_BLOCKS.contains(state.getBlock());
+    }
+
+    private static boolean isAxeMineableBlock(@NotNull BlockState state) {
+        return isTagged(state, BlockTags.MINEABLE_WITH_AXE);
+    }
+
+    private static boolean isHoeMineableBlock(@NotNull BlockState state) {
+        return isTagged(state, BlockTags.MINEABLE_WITH_HOE);
     }
 
     private static boolean isTagged(@NotNull BlockState state, TagKey<@NotNull Block> tag) {

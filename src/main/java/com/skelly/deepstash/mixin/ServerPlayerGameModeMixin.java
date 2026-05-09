@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerPlayerGameMode;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ItemStack;
@@ -84,9 +85,7 @@ public abstract class ServerPlayerGameModeMixin {
         if (isCreative()) return;
 
         @NotNull BlockState state = level.getBlockState(pos);
-        if (state.isAir() || !ExcaMateMiningRules.isVeinMineableBlock(state)) return;
-        if (!ExcaMateMiningRules.canUseCorrectTool(player, state)) return;
-        if (!excamate$isSafeExcaMateBlock(pos, state)) return;
+        if (state.isAir() || !excamate$canMineWithExcaMate(pos, state, config)) return;
 
         excamate$pendingPos = pos;
         excamate$pendingState = state;
@@ -129,7 +128,7 @@ public abstract class ServerPlayerGameModeMixin {
 
         int capturedXp;
         try {
-            if (excamate$shouldAutoPickupExcaMateDrops()) {
+            if (excamate$shouldAutoPickupExcaMateDrops(brokenState)) {
                 excamate$stashDropsNear(pos);
             }
 
@@ -304,11 +303,12 @@ public abstract class ServerPlayerGameModeMixin {
 
     private boolean excamate$breakExcaMateBlock(@NotNull BlockPos blockPos) {
         boolean wasProcessingExcaMateBreak = excamate$processingExcaMateBreak;
+        BlockState state = level.getBlockState(blockPos);
         excamate$breakingBlock = true;
         excamate$processingExcaMateBreak = true;
         try {
             boolean destroyed = destroyBlock(blockPos);
-            if (destroyed && excamate$shouldAutoPickupExcaMateDrops()) {
+            if (destroyed && excamate$shouldAutoPickupExcaMateDrops(state)) {
                 excamate$stashDropsNear(blockPos);
             }
 
@@ -379,9 +379,8 @@ public abstract class ServerPlayerGameModeMixin {
 
         @NotNull BlockState candidateState = level.getBlockState(candidate);
         return !candidateState.isAir()
-            && excamate$isSafeExcaMateBlock(candidate, candidateState)
             && ExcaMateMiningRules.isSameOreType(startState, candidateState)
-            && ExcaMateMiningRules.canUseCorrectTool(player, candidateState);
+            && excamate$canMineWithExcaMate(candidate, candidateState);
     }
 
     private boolean excamate$isMatchingMineableNeighbor(@NotNull BlockPos pos, @NotNull BlockState startState) {
@@ -390,8 +389,7 @@ public abstract class ServerPlayerGameModeMixin {
         @NotNull BlockState state = level.getBlockState(pos);
         return excamate$isSameVeinType(startState, state)
             && !state.isAir()
-            && excamate$isSafeExcaMateBlock(pos, state)
-            && ExcaMateMiningRules.canUseCorrectTool(player, state)
+            && excamate$canMineWithExcaMate(pos, state)
             && (ExcaMateMiningRules.isWoodBlock(startState) || excamate$isInMiningRange(pos));
     }
 
@@ -400,24 +398,41 @@ public abstract class ServerPlayerGameModeMixin {
 
         @NotNull BlockState state = level.getBlockState(pos);
         return !state.isAir()
-            && excamate$isSafeExcaMateBlock(pos, state)
-            && ExcaMateMiningRules.isVeinMineableBlock(state)
-            && ExcaMateMiningRules.canUseCorrectTool(player, state);
+            && excamate$canMineWithExcaMate(pos, state);
+    }
+
+    private boolean excamate$canMineWithExcaMate(@NotNull BlockPos pos, @NotNull BlockState state) {
+        ExcaMateConfig config = ExcaMate.config;
+        return config != null && excamate$canMineWithExcaMate(pos, state, config);
+    }
+
+    private boolean excamate$canMineWithExcaMate(
+        @NotNull BlockPos pos,
+        @NotNull BlockState state,
+        @NotNull ExcaMateConfig config
+    ) {
+        return excamate$isSafeExcaMateBlock(pos, state)
+            && ExcaMateMiningRules.canMineWithExcaMate(player, state, config);
     }
 
     private boolean excamate$isSafeExcaMateBlock(@NotNull BlockPos pos, @NotNull BlockState state) {
         if (level.getBlockEntity(pos) != null) return false;
 
-        return !state.is(Blocks.BEDROCK)
+        return !state.is(Blocks.CHEST)
+            && !state.is(Blocks.TRAPPED_CHEST)
+            && !state.is(Blocks.BARREL)
+            && !state.is(BlockTags.SHULKER_BOXES)
+            && !state.is(Blocks.ENDER_CHEST)
+            && !state.is(Blocks.BEDROCK)
             && !state.is(Blocks.END_PORTAL_FRAME)
             && !state.is(Blocks.COMMAND_BLOCK)
             && !state.is(Blocks.CHAIN_COMMAND_BLOCK)
             && !state.is(Blocks.REPEATING_COMMAND_BLOCK)
             && !state.is(Blocks.STRUCTURE_BLOCK)
             && !state.is(Blocks.STRUCTURE_VOID)
+            && !state.is(Blocks.JIGSAW)
             && !state.is(Blocks.BARRIER)
-            && !state.is(Blocks.SPAWNER)
-            && !state.is(Blocks.ANCIENT_DEBRIS);
+            && !state.is(Blocks.SPAWNER);
     }
 
     private boolean excamate$isSameVeinType(@NotNull BlockState startState, @NotNull BlockState state) {
@@ -465,12 +480,17 @@ public abstract class ServerPlayerGameModeMixin {
         return ExcaMateNetworking.isVeinKeyHeld(player);
     }
 
-    private boolean excamate$shouldAutoPickupExcaMateDrops() {
+    private boolean excamate$shouldAutoPickupExcaMateDrops(@NotNull BlockState sourceState) {
         ExcaMateConfig config = ExcaMate.config;
         return config != null
             && config.autoPickup
             && excamate$processingExcaMateBreak
-            && excamate$isVeinMiningActive();
+            && excamate$isVeinMiningActive()
+            && !config.isAutoPickupBlockBlocked(sourceState.getBlock())
+            && (
+                ExcaMateMiningRules.isDefaultSupportedBlock(sourceState)
+                    || config.isExtraAutoPickupBlockAllowed(sourceState.getBlock())
+            );
     }
 
     private void excamate$tryPlaceBranchTorch(@NotNull Direction facing) {
