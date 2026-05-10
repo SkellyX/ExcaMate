@@ -111,15 +111,6 @@ You can still edit `config/excamate.json` manually if preferred. New config file
 - Fabric API
 - Java `25` or newer
 
-## Building
-
-Run:
-
-```powershell
-.\gradlew.bat build
-```
-
-The compiled jar is written to `build/libs/`.
 
 ## License
 
