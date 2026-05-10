@@ -28,9 +28,10 @@ public class ExcaMateConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("excamate.json");
     private static final Path LEGACY_CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("deepstash.json");
-    private static final int DEFAULT_VEIN_MAX_BLOCKS = 16;
+    private static final int DEFAULT_VEIN_MAX_BLOCKS = 12;
     private static final int DEFAULT_BRANCH_MAX_BLOCKS = 16;
-    private static final int DEFAULT_EXCAMATE_MAX_BLOCKS = 16;
+    private static final int DEFAULT_EXCAMATE_MAX_BLOCKS = 27;
+    private static final int LEGACY_DEFAULT_MAX_BLOCKS = 16;
     private static final int SAFE_MAX_BLOCK_LIMIT = 128;
 
     public boolean autoPickup = true;
@@ -42,12 +43,10 @@ public class ExcaMateConfig {
     public String defaultMode = ExcaMateMode.VEIN.configName();
     public List<@NotNull String> extraVeinMineAllowList = new ArrayList<>();
     public List<@NotNull String> veinMineBlockList = new ArrayList<>();
-    public List<@NotNull String> extraAutoPickupAllowList = new ArrayList<>();
     public List<@NotNull String> autoPickupBlockList = new ArrayList<>();
 
     private transient Set<@NotNull Block> extraVeinMineAllowBlocks = Set.of();
     private transient Set<@NotNull Block> veinMineBlockedBlocks = Set.of();
-    private transient Set<@NotNull Block> extraAutoPickupAllowBlocks = Set.of();
     private transient Set<@NotNull Block> autoPickupBlockedBlocks = Set.of();
 
     public static @NotNull ExcaMateConfig load() {
@@ -83,8 +82,8 @@ public class ExcaMateConfig {
         @Nullable ExcaMateConfig config = GSON.fromJson(json, ExcaMateConfig.class);
         config = config == null ? new ExcaMateConfig() : config;
         migrateLegacyMaxBlockLimit(json, config);
+        migrateOldDefaultBlockLimits(json, config);
         migrateLegacyVeinMineAllowList(json, config);
-        migrateLegacyAutoPickupAllowList(json, config);
         return config;
     }
 
@@ -97,6 +96,8 @@ public class ExcaMateConfig {
         if (legacyLimit == null || !legacyLimit.isJsonPrimitive() || !legacyLimit.getAsJsonPrimitive().isNumber()) return;
 
         int fallback = legacyLimit.getAsInt();
+        if (fallback == LEGACY_DEFAULT_MAX_BLOCKS) return;
+
         if (!object.has("veinMaxBlocks")) {
             config.veinMaxBlocks = fallback;
         }
@@ -106,6 +107,28 @@ public class ExcaMateConfig {
         if (!object.has("excaMateMaxBlocks")) {
             config.excaMateMaxBlocks = fallback;
         }
+    }
+
+    private static void migrateOldDefaultBlockLimits(@NotNull String json, @NotNull ExcaMateConfig config) {
+        JsonElement parsed = JsonParser.parseString(json);
+        if (!parsed.isJsonObject()) return;
+
+        JsonObject object = parsed.getAsJsonObject();
+        if (!hasNumberValue(object, "veinMaxBlocks", LEGACY_DEFAULT_MAX_BLOCKS)) return;
+        if (!hasNumberValue(object, "branchMaxBlocks", LEGACY_DEFAULT_MAX_BLOCKS)) return;
+        if (!hasNumberValue(object, "excaMateMaxBlocks", LEGACY_DEFAULT_MAX_BLOCKS)) return;
+
+        config.veinMaxBlocks = DEFAULT_VEIN_MAX_BLOCKS;
+        config.branchMaxBlocks = DEFAULT_BRANCH_MAX_BLOCKS;
+        config.excaMateMaxBlocks = DEFAULT_EXCAMATE_MAX_BLOCKS;
+    }
+
+    private static boolean hasNumberValue(@NotNull JsonObject object, @NotNull String fieldName, int expectedValue) {
+        JsonElement value = object.get(fieldName);
+        return value != null
+            && value.isJsonPrimitive()
+            && value.getAsJsonPrimitive().isNumber()
+            && value.getAsInt() == expectedValue;
     }
 
     private static void migrateLegacyVeinMineAllowList(@NotNull String json, @NotNull ExcaMateConfig config) {
@@ -127,25 +150,6 @@ public class ExcaMateConfig {
         }
     }
 
-    private static void migrateLegacyAutoPickupAllowList(@NotNull String json, @NotNull ExcaMateConfig config) {
-        JsonElement parsed = JsonParser.parseString(json);
-        if (!parsed.isJsonObject()) return;
-
-        JsonObject object = parsed.getAsJsonObject();
-        if (object.has("extraAutoPickupAllowList") || !object.has("autoPickupAllowList")) return;
-
-        JsonElement legacyAllowList = object.get("autoPickupAllowList");
-        if (!legacyAllowList.isJsonArray()) return;
-
-        JsonArray legacyValues = legacyAllowList.getAsJsonArray();
-        config.extraAutoPickupAllowList = new ArrayList<>();
-        for (JsonElement value : legacyValues) {
-            if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) {
-                config.extraAutoPickupAllowList.add(value.getAsString());
-            }
-        }
-    }
-
     public void validate() {
         // ExcaMate block caps are per-mode now. The old veinMinerMaxBlocks value is
         // only read as a migration fallback, then omitted when this config is saved.
@@ -157,12 +161,10 @@ public class ExcaMateConfig {
 
         extraVeinMineAllowList = nonNullList(extraVeinMineAllowList);
         veinMineBlockList = nonNullList(veinMineBlockList);
-        extraAutoPickupAllowList = nonNullList(extraAutoPickupAllowList);
         autoPickupBlockList = nonNullList(autoPickupBlockList);
 
         extraVeinMineAllowBlocks = parseBlockList("extraVeinMineAllowList", extraVeinMineAllowList);
         veinMineBlockedBlocks = parseBlockList("veinMineBlockList", veinMineBlockList);
-        extraAutoPickupAllowBlocks = parseBlockList("extraAutoPickupAllowList", extraAutoPickupAllowList);
         autoPickupBlockedBlocks = parseBlockList("autoPickupBlockList", autoPickupBlockList);
     }
 
@@ -205,10 +207,6 @@ public class ExcaMateConfig {
 
     public boolean isVeinMineBlockBlocked(@NotNull Block block) {
         return veinMineBlockedBlocks.contains(block);
-    }
-
-    public boolean isExtraAutoPickupBlockAllowed(@NotNull Block block) {
-        return extraAutoPickupAllowBlocks.contains(block);
     }
 
     public boolean isAutoPickupBlockBlocked(@NotNull Block block) {

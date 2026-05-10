@@ -6,8 +6,8 @@ import java.util.Locale;
 
 public enum ExcaMateMode {
     VEIN("Vein"),
-    BRANCH_1X2("Branch Tunnel"),
-    EXCAVATE_3X3("3x3 Excavation");
+    BRANCH_1X2("Branch"),
+    EXCAVATE_3X3("Excavate");
 
     private final String displayName;
 
@@ -30,8 +30,13 @@ public enum ExcaMateMode {
 
     public static @NotNull ExcaMateMode fromConfigName(String value) {
         if (value != null) {
+            String normalized = value.trim().toUpperCase(Locale.ROOT);
+            if ("EXCAMATE_3X3".equals(normalized) || "EXCAVATE_3X3X3".equals(normalized)) {
+                return EXCAVATE_3X3;
+            }
+
             try {
-                return valueOf(value.trim().toUpperCase(Locale.ROOT));
+                return valueOf(normalized);
             } catch (IllegalArgumentException ignored) {
                 // Fall through to the safe default for old or manually edited configs.
             }

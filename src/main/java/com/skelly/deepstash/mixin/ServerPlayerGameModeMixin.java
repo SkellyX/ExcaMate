@@ -166,7 +166,7 @@ public abstract class ServerPlayerGameModeMixin {
         return switch (ExcaMateNetworking.getMode(player)) {
             case VEIN -> excamate$collectVeinModeBlocks(startPos, startState, maxBlocks);
             case BRANCH_1X2 -> excamate$collectBranchTunnel(startPos, startState, maxBlocks);
-            case EXCAVATE_3X3 -> excamate$collectExcavationFace(startPos, startState, maxBlocks);
+            case EXCAVATE_3X3 -> excamate$collectExcavationVolume(startPos, startState, maxBlocks);
         };
     }
 
@@ -238,16 +238,20 @@ public abstract class ServerPlayerGameModeMixin {
         }
     }
 
-    private List<@NotNull BlockPos> excamate$collectExcavationFace(@NotNull BlockPos startPos, @NotNull BlockState startState, int maxBlocks) {
+    private List<@NotNull BlockPos> excamate$collectExcavationVolume(@NotNull BlockPos startPos, @NotNull BlockState startState, int maxBlocks) {
         List<@NotNull BlockPos> blocksToMine = new ArrayList<>();
         Direction hitDirection = excamate$getHitDirectionFor(startPos);
+        Direction depthDirection = hitDirection.getOpposite();
 
-        for (int firstAxis = -1; firstAxis <= 1 && blocksToMine.size() < maxBlocks; firstAxis++) {
-            for (int secondAxis = -1; secondAxis <= 1 && blocksToMine.size() < maxBlocks; secondAxis++) {
-                BlockPos candidate = excamate$getExcavationFacePos(startPos, hitDirection, firstAxis, secondAxis);
-                if (candidate.equals(startPos)) continue;
-                if (excamate$isValidPatternBlock(candidate, startState)) {
-                    blocksToMine.add(candidate);
+        for (int depth = 0; depth < 3 && blocksToMine.size() < maxBlocks; depth++) {
+            BlockPos layerCenter = startPos.relative(depthDirection, depth);
+            for (int firstAxis = -1; firstAxis <= 1 && blocksToMine.size() < maxBlocks; firstAxis++) {
+                for (int secondAxis = -1; secondAxis <= 1 && blocksToMine.size() < maxBlocks; secondAxis++) {
+                    BlockPos candidate = excamate$getExcavationVolumePos(layerCenter, depthDirection, firstAxis, secondAxis);
+                    if (candidate.equals(startPos)) continue;
+                    if (excamate$isValidPatternBlock(candidate, startState)) {
+                        blocksToMine.add(candidate);
+                    }
                 }
             }
         }
@@ -272,11 +276,11 @@ public abstract class ServerPlayerGameModeMixin {
         }
     }
 
-    private BlockPos excamate$getExcavationFacePos(@NotNull BlockPos center, @NotNull Direction hitDirection, int firstAxis, int secondAxis) {
-        return switch (hitDirection) {
-            case UP, DOWN -> center.offset(firstAxis, 0, secondAxis);
-            case NORTH, SOUTH -> center.offset(firstAxis, secondAxis, 0);
-            case EAST, WEST -> center.offset(0, secondAxis, firstAxis);
+    private BlockPos excamate$getExcavationVolumePos(@NotNull BlockPos center, @NotNull Direction depthDirection, int firstAxis, int secondAxis) {
+        return switch (depthDirection.getAxis()) {
+            case Y -> center.offset(firstAxis, 0, secondAxis);
+            case Z -> center.offset(firstAxis, secondAxis, 0);
+            case X -> center.offset(0, secondAxis, firstAxis);
         };
     }
 
@@ -463,17 +467,18 @@ public abstract class ServerPlayerGameModeMixin {
     }
 
     private int excamate$getConfiguredExtraBlockLimit(@NotNull ExcaMateMode mode) {
-        // The player breaks the first block normally; this cap applies to the extra blocks
-        // ExcaMate may add during the hold-to-activate mining action. Caps are per-mode
-        // so vein, branch, and excavation mining can be tuned independently.
+        // Configured caps represent the total action size, including the first block
+        // broken by vanilla before ExcaMate adds any extra blocks.
         ExcaMateConfig config = ExcaMate.config;
         if (config == null) return 0;
 
-        return switch (mode) {
+        int totalBlockLimit = switch (mode) {
             case VEIN -> config.veinMaxBlocks;
             case BRANCH_1X2 -> config.branchMaxBlocks;
             case EXCAVATE_3X3 -> config.excaMateMaxBlocks;
         };
+
+        return Math.max(0, totalBlockLimit - 1);
     }
 
     private boolean excamate$isVeinMiningActive() {
@@ -486,11 +491,7 @@ public abstract class ServerPlayerGameModeMixin {
             && config.autoPickup
             && excamate$processingExcaMateBreak
             && excamate$isVeinMiningActive()
-            && !config.isAutoPickupBlockBlocked(sourceState.getBlock())
-            && (
-                ExcaMateMiningRules.isDefaultSupportedBlock(sourceState)
-                    || config.isExtraAutoPickupBlockAllowed(sourceState.getBlock())
-            );
+            && !config.isAutoPickupBlockBlocked(sourceState.getBlock());
     }
 
     private void excamate$tryPlaceBranchTorch(@NotNull Direction facing) {
