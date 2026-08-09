@@ -1,7 +1,7 @@
-package com.skelly.deepstash.client;
+package com.skelly.excamate.client;
 
-import com.skelly.deepstash.ExcaMate;
-import com.skelly.deepstash.ExcaMateNetworking;
+import com.skelly.excamate.ExcaMate;
+import com.skelly.excamate.ExcaMateNetworking;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;

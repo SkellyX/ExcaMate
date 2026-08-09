@@ -1,8 +1,8 @@
-package com.skelly.deepstash.client;
+package com.skelly.excamate.client;
 
-import com.skelly.deepstash.ExcaMate;
-import com.skelly.deepstash.ExcaMateMode;
-import com.skelly.deepstash.config.ExcaMateConfig;
+import com.skelly.excamate.ExcaMate;
+import com.skelly.excamate.ExcaMateMode;
+import com.skelly.excamate.config.ExcaMateConfig;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
@@ -76,6 +76,12 @@ public final class ExcaMateConfigScreen {
             .setDefaultValue(true)
             .setTooltip(translatable("tooltip.auto_torch"))
             .setSaveConsumer(value -> config.autoTorchInBranchMode = value)
+            .build());
+
+        general.addEntry(entries.startBooleanToggle(translatable("option.auto_replant"), config.autoReplantCrops)
+            .setDefaultValue(true)
+            .setTooltip(translatable("tooltip.auto_replant"))
+            .setSaveConsumer(value -> config.autoReplantCrops = value)
             .build());
 
         general.addEntry(entries.startEnumSelector(

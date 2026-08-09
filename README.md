@@ -2,6 +2,144 @@
 
 ExcaMate is an efficient Fabric mining companion that lets you vein mine ores, branch mine tunnels, and excavate 3x3x3 areas much faster, with optional auto-pickup for drops and direct XP collection.
 
+## ExcaMate 1.3.0
+
+### Compatibility
+
+- Updated for Minecraft 26.2.
+- Updated to Fabric Loader 0.19.3.
+- Updated Fabric API support and tested against Fabric API 0.156.0+26.2.
+- Improved compatibility with newer Fabric API versions within the Minecraft 26.2 release line.
+
+### New Feature: Auto-Replant Crops
+
+ExcaMate can now automatically replant crops after harvesting them.
+
+To use it, hold the seeds or crop you want to replant in your off-hand before harvesting and harvest while holding down the excavate keybind.
+
+Supported crops:
+
+- Wheat
+- Carrots
+- Potatoes
+- Beetroot
+- Nether wart
+- Torchflowers
+- Pitcher plants
+
+Auto-replanting can be turned off in ExcaMate's settings.
+
+### New Vein-Mineable Blocks
+
+#### Mining & Stone
+
+Pickaxe:
+
+- Sandstone and its variants
+- Tuff
+- Calcite
+- Dripstone
+- Blackstone
+- Blackstone slabs, stairs and walls
+- Chiseled blackstone
+- Gilded blackstone
+
+#### The Nether
+
+Pickaxe:
+
+- Netherrack
+- Magma blocks
+- Nether brick blocks
+- Basalt
+- Polished basalt
+- Smooth basalt
+- Bone blocks
+
+Axe:
+
+- Crimson stems and wood
+- Warped stems and wood
+- Mushroom blocks
+
+Shovel:
+
+- Crimson nylium
+- Warped nylium
+
+Crimson and warped wood now behave like normal overworld wood when using ExcaMate.
+
+#### The End
+
+Pickaxe:
+
+- End stone
+- End stone bricks
+- Purpur blocks
+- Purpur pillars
+- Crying obsidian
+
+Axe:
+
+- Chorus plants
+
+Chorus flowers are left to fall naturally after the supporting plant is removed.
+
+#### Deep Dark
+
+Hoe:
+
+- Sculk
+- Sculk catalysts
+- Sculk sensors
+- Sculk shriekers
+
+#### Farming & Plants
+
+Hoe:
+
+- Crops
+- Sugar cane
+- Cactus
+- Kelp
+- Bamboo
+- Vines
+- Other supported tall plants
+
+Sword:
+
+- Bamboo can also be vein-mined with a sword, matching normal Minecraft tool behaviour.
+
+#### Soil & Terrain
+
+Shovel:
+
+- Soul sand
+- Soul soil
+- Mud
+- Snow
+
+### Behaviour Changes
+
+- Chests, barrels, furnaces and other storage or utility blocks are no longer vein-mined by default.
+- These blocks can still be added manually through ExcaMate's settings if you specifically want them included.
+- Only vanilla Minecraft blocks are included by default.
+- Blocks added by other mods can still be added manually through the settings.
+
+### Configuration Improvements
+
+- Added the Auto-Replant Crops option to the in-game configuration screen.
+- Added clearer text and tooltip information for the new setting.
+- Added internal configuration versioning to make future config migrations safer.
+- Removed an old migration rule that could potentially overwrite a user's deliberately chosen block-limit settings.
+- Existing Deepstash configuration migration support has been preserved.
+
+### Mod Compatibility Improvements
+
+- Mod Menu is now fully optional.
+- Cloth Config is now fully optional.
+- ExcaMate can run on dedicated servers without either Mod Menu or Cloth Config installed.
+
 ## Features
 
 - Hold-to-activate mining, no toggle state.
@@ -16,6 +154,7 @@ ExcaMate is an efficient Fabric mining companion that lets you vein mine ores, b
 - Optional direct XP collection.
 - Optional item auto-pickup.
 - Optional auto-torch placement in Branch mode when torches are in your off-hand.
+- Optional automatic crop replanting using seeds or crops in your off-hand.
 - Configurable block limits per mode.
 - Configurable allowlists and blocklists for mass mining and auto-pickup.
 - In-game configuration through Mod Menu and Cloth Config.
@@ -67,6 +206,7 @@ The in-game settings screen includes:
   - Auto-pickup drops
   - Direct XP collection
   - Auto torch placement in Branch mode
+  - Automatically replant crops
   - Default mining mode
 - **Block Limits**
   - Vein max blocks: default `12`
@@ -91,9 +231,11 @@ You can still edit `config/excamate.json` manually if preferred. New config file
 
 ```json
 {
+  "configVersion": 1,
   "autoPickup": true,
   "autoCollectXp": true,
   "autoTorchInBranchMode": true,
+  "autoReplantCrops": true,
   "veinMaxBlocks": 12,
   "branchMaxBlocks": 16,
   "excaMateMaxBlocks": 27,
@@ -106,8 +248,8 @@ You can still edit `config/excamate.json` manually if preferred. New config file
 
 ## Requirements
 
-- Minecraft `26.1.2`
-- Fabric Loader `0.19.2` or newer
+- Minecraft `26.2`
+- Fabric Loader `0.19.3` or newer
 - Fabric API
 - Java `25` or newer
 

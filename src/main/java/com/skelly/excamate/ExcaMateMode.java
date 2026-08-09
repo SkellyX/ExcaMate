@@ -1,4 +1,4 @@
-package com.skelly.deepstash;
+package com.skelly.excamate;
 
 import org.jetbrains.annotations.NotNull;
 

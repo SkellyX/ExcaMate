@@ -1,28 +1,28 @@
-package com.skelly.deepstash;
+package com.skelly.excamate;
 
-import com.skelly.deepstash.config.ExcaMateConfig;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.tags.BlockTags;
+import com.skelly.excamate.config.ExcaMateConfig;
 import net.minecraft.tags.ItemTags;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.WeatheringCopperCollection;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class ExcaMateMiningRules {
-    // Common tags let correctly-tagged modded ores participate even when Minecraft has no vanilla ore-family tag for them.
-    private static final TagKey<@NotNull Block> COMMON_ORES = TagKey.create(
-        Registries.BLOCK,
-        Identifier.fromNamespaceAndPath("c", "ores")
-    );
 
-    private static final Set<@NotNull Block> STONE_BLOCKS = Set.of(
+    private static Stream<Block> copperStates(WeatheringCopperCollection<Block> collection) {
+        WeatheringCopperCollection.ByState<Block> states = collection.weathering();
+        return Stream.of(states.unaffected(), states.exposed(), states.weathered(), states.oxidized());
+    }
+
+    private static final Set<@NotNull Block> STONE_BLOCKS = Stream.concat(
+        Stream.of(
         Blocks.STONE, Blocks.GRANITE, Blocks.DIORITE, Blocks.ANDESITE, Blocks.DEEPSLATE,
         Blocks.COBBLESTONE, Blocks.MOSSY_COBBLESTONE, Blocks.STONE_BRICKS, Blocks.MOSSY_STONE_BRICKS,
         Blocks.CRACKED_STONE_BRICKS, Blocks.CHISELED_STONE_BRICKS, Blocks.COAL_ORE,
@@ -32,12 +32,45 @@ public final class ExcaMateMiningRules {
         Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS, Blocks.DEEPSLATE_COAL_ORE, Blocks.DEEPSLATE_COPPER_ORE,
         Blocks.DEEPSLATE_IRON_ORE, Blocks.DEEPSLATE_GOLD_ORE, Blocks.DEEPSLATE_LAPIS_ORE,
         Blocks.DEEPSLATE_DIAMOND_ORE, Blocks.DEEPSLATE_REDSTONE_ORE, Blocks.DEEPSLATE_EMERALD_ORE,
-        Blocks.RAW_IRON_BLOCK, Blocks.RAW_COPPER_BLOCK, Blocks.RAW_GOLD_BLOCK, Blocks.COPPER_BLOCK,
-        Blocks.EXPOSED_COPPER, Blocks.WEATHERED_COPPER, Blocks.OXIDIZED_COPPER, Blocks.CUT_COPPER,
-        Blocks.EXPOSED_CUT_COPPER, Blocks.WEATHERED_CUT_COPPER, Blocks.OXIDIZED_CUT_COPPER,
+        Blocks.RAW_IRON_BLOCK, Blocks.RAW_COPPER_BLOCK, Blocks.RAW_GOLD_BLOCK,
         Blocks.IRON_BLOCK, Blocks.GOLD_BLOCK, Blocks.LAPIS_BLOCK, Blocks.REDSTONE_BLOCK,
-        Blocks.DIAMOND_BLOCK, Blocks.EMERALD_BLOCK, Blocks.COAL_BLOCK, Blocks.AMETHYST_BLOCK
-    );
+        Blocks.DIAMOND_BLOCK, Blocks.EMERALD_BLOCK, Blocks.COAL_BLOCK, Blocks.AMETHYST_BLOCK,
+        // Nether
+        Blocks.NETHERRACK, Blocks.MAGMA_BLOCK,
+        Blocks.NETHER_BRICKS, Blocks.CRACKED_NETHER_BRICKS, Blocks.CHISELED_NETHER_BRICKS, Blocks.RED_NETHER_BRICKS,
+        Blocks.NETHER_BRICK_SLAB, Blocks.NETHER_BRICK_STAIRS, Blocks.NETHER_BRICK_WALL, Blocks.NETHER_BRICK_FENCE,
+        Blocks.RED_NETHER_BRICK_SLAB, Blocks.RED_NETHER_BRICK_STAIRS, Blocks.RED_NETHER_BRICK_WALL,
+        // The End
+        Blocks.END_STONE, Blocks.END_STONE_BRICKS,
+        Blocks.END_STONE_BRICK_SLAB, Blocks.END_STONE_BRICK_STAIRS, Blocks.END_STONE_BRICK_WALL,
+        Blocks.PURPUR_BLOCK, Blocks.PURPUR_PILLAR, Blocks.PURPUR_SLAB, Blocks.PURPUR_STAIRS,
+        // Cave
+        Blocks.TUFF, Blocks.CHISELED_TUFF, Blocks.POLISHED_TUFF, Blocks.TUFF_BRICKS,
+        Blocks.TUFF_SLAB, Blocks.TUFF_STAIRS, Blocks.TUFF_WALL,
+        Blocks.TUFF_BRICK_SLAB, Blocks.TUFF_BRICK_STAIRS, Blocks.TUFF_BRICK_WALL,
+        Blocks.POLISHED_TUFF_SLAB, Blocks.POLISHED_TUFF_STAIRS, Blocks.POLISHED_TUFF_WALL,
+        Blocks.CALCITE, Blocks.DRIPSTONE_BLOCK,
+        // Sandstone
+        Blocks.SANDSTONE, Blocks.CHISELED_SANDSTONE, Blocks.SMOOTH_SANDSTONE, Blocks.CUT_SANDSTONE,
+        Blocks.RED_SANDSTONE, Blocks.CHISELED_RED_SANDSTONE, Blocks.SMOOTH_RED_SANDSTONE, Blocks.CUT_RED_SANDSTONE,
+        Blocks.SANDSTONE_SLAB, Blocks.SANDSTONE_STAIRS, Blocks.SANDSTONE_WALL,
+        Blocks.RED_SANDSTONE_SLAB, Blocks.RED_SANDSTONE_STAIRS, Blocks.RED_SANDSTONE_WALL,
+        Blocks.SMOOTH_SANDSTONE_SLAB, Blocks.SMOOTH_SANDSTONE_STAIRS,
+        Blocks.CUT_SANDSTONE_SLAB, Blocks.CUT_RED_SANDSTONE_SLAB,
+        Blocks.SMOOTH_RED_SANDSTONE_SLAB, Blocks.SMOOTH_RED_SANDSTONE_STAIRS,
+        // Blackstone variants
+        Blocks.CHISELED_POLISHED_BLACKSTONE, Blocks.GILDED_BLACKSTONE,
+        Blocks.BLACKSTONE_SLAB, Blocks.BLACKSTONE_STAIRS, Blocks.BLACKSTONE_WALL,
+        Blocks.POLISHED_BLACKSTONE_SLAB, Blocks.POLISHED_BLACKSTONE_STAIRS, Blocks.POLISHED_BLACKSTONE_WALL,
+        Blocks.POLISHED_BLACKSTONE_BRICK_SLAB, Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS, Blocks.POLISHED_BLACKSTONE_BRICK_WALL,
+        // Nether terrain
+        Blocks.CRIMSON_NYLIUM, Blocks.WARPED_NYLIUM,
+        Blocks.POLISHED_BASALT, Blocks.SMOOTH_BASALT, Blocks.BONE_BLOCK,
+        // The End
+        Blocks.CRYING_OBSIDIAN
+        ),
+        Stream.concat(copperStates(Blocks.COPPER_BLOCK), copperStates(Blocks.CUT_COPPER))
+    ).collect(Collectors.toUnmodifiableSet());
 
     private static final Set<@NotNull Block> ORE_BLOCKS = Set.of(
         Blocks.COAL_ORE, Blocks.DEEPSLATE_COAL_ORE,
@@ -54,7 +87,30 @@ public final class ExcaMateMiningRules {
 
     private static final Set<@NotNull Block> SOIL_BLOCKS = Set.of(
         Blocks.DIRT, Blocks.COARSE_DIRT, Blocks.PODZOL, Blocks.MYCELIUM, Blocks.GRAVEL,
-        Blocks.SAND, Blocks.RED_SAND, Blocks.CLAY
+        Blocks.SAND, Blocks.RED_SAND, Blocks.CLAY,
+        Blocks.SOUL_SAND, Blocks.SOUL_SOIL, Blocks.MUD, Blocks.SNOW_BLOCK
+    );
+
+    // Tall, single-column plants (like trees) where a vein should reach the whole stalk regardless of player distance.
+    private static final Set<@NotNull Block> TALL_PLANT_BLOCKS = Set.of(
+        Blocks.SUGAR_CANE, Blocks.CACTUS, Blocks.BAMBOO,
+        Blocks.KELP, Blocks.KELP_PLANT,
+        Blocks.TWISTING_VINES, Blocks.TWISTING_VINES_PLANT,
+        Blocks.WEEPING_VINES, Blocks.WEEPING_VINES_PLANT
+    );
+
+
+    private static final Set<@NotNull Block> PLANT_BLOCKS = Set.of(
+        // Crops
+        Blocks.WHEAT, Blocks.CARROTS, Blocks.POTATOES, Blocks.BEETROOTS,
+        Blocks.NETHER_WART, Blocks.COCOA, Blocks.TORCHFLOWER_CROP, Blocks.PITCHER_CROP,
+        // Tall plants
+        Blocks.SUGAR_CANE, Blocks.CACTUS, Blocks.BAMBOO,
+        Blocks.KELP, Blocks.KELP_PLANT,
+        Blocks.TWISTING_VINES, Blocks.TWISTING_VINES_PLANT,
+        Blocks.WEEPING_VINES, Blocks.WEEPING_VINES_PLANT,
+        // Sculk (deep dark — hoe is the standard clearing tool in vanilla)
+        Blocks.SCULK, Blocks.SCULK_CATALYST, Blocks.SCULK_SENSOR, Blocks.SCULK_SHRIEKER
     );
 
     private static final Set<@NotNull Block> WOOD_BLOCKS = Set.of(
@@ -77,16 +133,24 @@ public final class ExcaMateMiningRules {
         Blocks.ACACIA_FENCE, Blocks.DARK_OAK_FENCE, Blocks.MANGROVE_FENCE, Blocks.CHERRY_FENCE,
         Blocks.OAK_FENCE_GATE, Blocks.SPRUCE_FENCE_GATE, Blocks.BIRCH_FENCE_GATE, Blocks.JUNGLE_FENCE_GATE,
         Blocks.ACACIA_FENCE_GATE, Blocks.DARK_OAK_FENCE_GATE, Blocks.MANGROVE_FENCE_GATE, Blocks.CHERRY_FENCE_GATE,
-        Blocks.BOOKSHELF, Blocks.CRAFTING_TABLE, Blocks.CHEST, Blocks.TRAPPED_CHEST,
-        Blocks.BARREL, Blocks.COMPOSTER, Blocks.LECTERN, Blocks.JUKEBOX, Blocks.NOTE_BLOCK,
-        Blocks.BEEHIVE, Blocks.BEE_NEST
+        Blocks.BOOKSHELF, Blocks.CRAFTING_TABLE, Blocks.COMPOSTER, Blocks.LECTERN,
+        Blocks.JUKEBOX, Blocks.NOTE_BLOCK, Blocks.BEEHIVE, Blocks.BEE_NEST,
+        Blocks.CHORUS_PLANT,
+        // Nether wood
+        Blocks.CRIMSON_STEM, Blocks.WARPED_STEM, Blocks.STRIPPED_CRIMSON_STEM, Blocks.STRIPPED_WARPED_STEM,
+        Blocks.CRIMSON_HYPHAE, Blocks.WARPED_HYPHAE, Blocks.STRIPPED_CRIMSON_HYPHAE, Blocks.STRIPPED_WARPED_HYPHAE,
+        Blocks.CRIMSON_PLANKS, Blocks.WARPED_PLANKS,
+        Blocks.CRIMSON_SLAB, Blocks.WARPED_SLAB, Blocks.CRIMSON_STAIRS, Blocks.WARPED_STAIRS,
+        Blocks.CRIMSON_FENCE, Blocks.WARPED_FENCE, Blocks.CRIMSON_FENCE_GATE, Blocks.WARPED_FENCE_GATE,
+        // Mushroom
+        Blocks.MUSHROOM_STEM, Blocks.RED_MUSHROOM_BLOCK, Blocks.BROWN_MUSHROOM_BLOCK
     );
 
     private ExcaMateMiningRules() {
     }
 
     public static boolean isVeinMineableBlock(@NotNull BlockState state) {
-        return isPickaxeMineableBlock(state) || isOreBlock(state) || isSoilBlock(state) || isWoodBlock(state);
+        return isPickaxeMineableBlock(state) || isOreBlock(state) || isSoilBlock(state) || isWoodBlock(state) || isPlantBlock(state);
     }
 
     public static boolean isDefaultSupportedBlock(@NotNull BlockState state) {
@@ -107,12 +171,28 @@ public final class ExcaMateMiningRules {
         return canUseCorrectToolForBlock(player, state);
     }
 
+    public static boolean isPlantBlock(@NotNull BlockState state) {
+        return PLANT_BLOCKS.contains(state.getBlock());
+    }
+
+    public static boolean isTallPlantBlock(@NotNull BlockState state) {
+        return TALL_PLANT_BLOCKS.contains(state.getBlock());
+    }
+
+    // Plants that vanilla connects via a support chain: removing one link collapses every
+    // disconnected piece above/around it, each dropping items at its own position rather than
+    // wherever the player actually broke a block. Auto-pickup needs to sweep the whole connected
+    // structure for these, not just the positions ExcaMate itself broke.
+    public static boolean isCascadingPlantBlock(@NotNull BlockState state) {
+        return isTallPlantBlock(state) || state.getBlock() == Blocks.CHORUS_PLANT;
+    }
+
     public static boolean isWoodBlock(@NotNull BlockState state) {
-        return isTagged(state, BlockTags.LOGS) || WOOD_BLOCKS.contains(state.getBlock());
+        return WOOD_BLOCKS.contains(state.getBlock());
     }
 
     public static boolean isOreBlock(@NotNull BlockState state) {
-        return oreType(state) != OreType.NONE || isTagged(state, COMMON_ORES) || ORE_BLOCKS.contains(state.getBlock());
+        return oreType(state) != OreType.NONE;
     }
 
     public static boolean isSameOreType(@NotNull BlockState first, @NotNull BlockState second) {
@@ -133,7 +213,7 @@ public final class ExcaMateMiningRules {
             if (heldItem.is(ItemTags.PICKAXES) && heldItem.isCorrectToolForDrops(state)) return true;
         }
 
-        if (isAxeMineableBlock(state) || isWoodBlock(state)) {
+        if (isWoodBlock(state)) {
             if (heldItem.is(ItemTags.AXES) && heldItem.isCorrectToolForDrops(state)) return true;
         }
 
@@ -141,43 +221,26 @@ public final class ExcaMateMiningRules {
             if (heldItem.is(ItemTags.SHOVELS) && heldItem.isCorrectToolForDrops(state)) return true;
         }
 
-        if (isHoeMineableBlock(state)) {
-            if (heldItem.is(ItemTags.HOES) && heldItem.isCorrectToolForDrops(state)) return true;
+        if (isPlantBlock(state)) {
+            // Crops/tall plants aren't in vanilla's mineable/hoe tag (only leaves, hay, sculk, etc. are),
+            // so isCorrectToolForDrops would reject them — the hoe is ExcaMate's own plant-category tool, not vanilla's.
+            if (heldItem.is(ItemTags.HOES)) return true;
+            // Bamboo is instantly broken by swords in vanilla — sword-specific carve-out
+            if (state.getBlock() == Blocks.BAMBOO && heldItem.is(ItemTags.SWORDS)) return true;
         }
 
         return false;
     }
 
     private static boolean isPickaxeMineableBlock(@NotNull BlockState state) {
-        return isTagged(state, BlockTags.MINEABLE_WITH_PICKAXE) || STONE_BLOCKS.contains(state.getBlock());
+        return STONE_BLOCKS.contains(state.getBlock());
     }
 
     private static boolean isSoilBlock(@NotNull BlockState state) {
-        return isTagged(state, BlockTags.MINEABLE_WITH_SHOVEL) || SOIL_BLOCKS.contains(state.getBlock());
-    }
-
-    private static boolean isAxeMineableBlock(@NotNull BlockState state) {
-        return isTagged(state, BlockTags.MINEABLE_WITH_AXE);
-    }
-
-    private static boolean isHoeMineableBlock(@NotNull BlockState state) {
-        return isTagged(state, BlockTags.MINEABLE_WITH_HOE);
-    }
-
-    private static boolean isTagged(@NotNull BlockState state, TagKey<@NotNull Block> tag) {
-        return state.typeHolder().is(tag);
+        return SOIL_BLOCKS.contains(state.getBlock());
     }
 
     private static OreType oreType(@NotNull BlockState state) {
-        if (isTagged(state, BlockTags.COAL_ORES)) return OreType.COAL;
-        if (isTagged(state, BlockTags.COPPER_ORES)) return OreType.COPPER;
-        if (isTagged(state, BlockTags.IRON_ORES)) return OreType.IRON;
-        if (isTagged(state, BlockTags.GOLD_ORES)) return OreType.GOLD;
-        if (isTagged(state, BlockTags.LAPIS_ORES)) return OreType.LAPIS;
-        if (isTagged(state, BlockTags.DIAMOND_ORES)) return OreType.DIAMOND;
-        if (isTagged(state, BlockTags.REDSTONE_ORES)) return OreType.REDSTONE;
-        if (isTagged(state, BlockTags.EMERALD_ORES)) return OreType.EMERALD;
-
         return oreType(state.getBlock());
     }
 

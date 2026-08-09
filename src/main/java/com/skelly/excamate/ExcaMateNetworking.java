@@ -1,4 +1,4 @@
-package com.skelly.deepstash;
+package com.skelly.excamate;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
