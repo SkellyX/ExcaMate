@@ -1,4 +1,4 @@
-package com.skelly.deepstash.config;
+package com.skelly.excamate.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -7,8 +7,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonParseException;
-import com.skelly.deepstash.ExcaMate;
-import com.skelly.deepstash.ExcaMateMode;
+import com.skelly.excamate.ExcaMate;
+import com.skelly.excamate.ExcaMateMode;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -33,10 +33,13 @@ public class ExcaMateConfig {
     private static final int DEFAULT_EXCAMATE_MAX_BLOCKS = 27;
     private static final int LEGACY_DEFAULT_MAX_BLOCKS = 16;
     private static final int SAFE_MAX_BLOCK_LIMIT = 128;
+    private static final int CURRENT_CONFIG_VERSION = 1;
 
+    public int configVersion = CURRENT_CONFIG_VERSION;
     public boolean autoPickup = true;
     public boolean autoCollectXp = true;
     public boolean autoTorchInBranchMode = true;
+    public boolean autoReplantCrops = true;
     public int veinMaxBlocks = DEFAULT_VEIN_MAX_BLOCKS;
     public int branchMaxBlocks = DEFAULT_BRANCH_MAX_BLOCKS;
     public int excaMateMaxBlocks = DEFAULT_EXCAMATE_MAX_BLOCKS;
@@ -82,7 +85,6 @@ public class ExcaMateConfig {
         @Nullable ExcaMateConfig config = GSON.fromJson(json, ExcaMateConfig.class);
         config = config == null ? new ExcaMateConfig() : config;
         migrateLegacyMaxBlockLimit(json, config);
-        migrateOldDefaultBlockLimits(json, config);
         migrateLegacyVeinMineAllowList(json, config);
         return config;
     }
@@ -107,28 +109,6 @@ public class ExcaMateConfig {
         if (!object.has("excaMateMaxBlocks")) {
             config.excaMateMaxBlocks = fallback;
         }
-    }
-
-    private static void migrateOldDefaultBlockLimits(@NotNull String json, @NotNull ExcaMateConfig config) {
-        JsonElement parsed = JsonParser.parseString(json);
-        if (!parsed.isJsonObject()) return;
-
-        JsonObject object = parsed.getAsJsonObject();
-        if (!hasNumberValue(object, "veinMaxBlocks", LEGACY_DEFAULT_MAX_BLOCKS)) return;
-        if (!hasNumberValue(object, "branchMaxBlocks", LEGACY_DEFAULT_MAX_BLOCKS)) return;
-        if (!hasNumberValue(object, "excaMateMaxBlocks", LEGACY_DEFAULT_MAX_BLOCKS)) return;
-
-        config.veinMaxBlocks = DEFAULT_VEIN_MAX_BLOCKS;
-        config.branchMaxBlocks = DEFAULT_BRANCH_MAX_BLOCKS;
-        config.excaMateMaxBlocks = DEFAULT_EXCAMATE_MAX_BLOCKS;
-    }
-
-    private static boolean hasNumberValue(@NotNull JsonObject object, @NotNull String fieldName, int expectedValue) {
-        JsonElement value = object.get(fieldName);
-        return value != null
-            && value.isJsonPrimitive()
-            && value.getAsJsonPrimitive().isNumber()
-            && value.getAsInt() == expectedValue;
     }
 
     private static void migrateLegacyVeinMineAllowList(@NotNull String json, @NotNull ExcaMateConfig config) {

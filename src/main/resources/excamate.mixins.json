@@ -1,6 +1,6 @@
 {
 	"required": true,
-	"package": "com.skelly.deepstash.mixin",
+	"package": "com.skelly.excamate.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"BlockXpMixin",

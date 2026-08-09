@@ -1,6 +1,6 @@
-package com.skelly.deepstash;
+package com.skelly.excamate;
 
-import com.skelly.deepstash.config.ExcaMateConfig;
+import com.skelly.excamate.config.ExcaMateConfig;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +15,7 @@ public class ExcaMate implements ModInitializer {
 		LOGGER.info("ExcaMate initializing...");
 		config = ExcaMateConfig.load();
 		ExcaMateNetworking.register();
+		ExcaMateDropSweeper.register();
 		LOGGER.info(
 			"ExcaMate loaded! Auto-pickup: {}, auto-XP: {}, mode limits: vein={}, branch={}, excavation={}, default mode: {}",
 			config.autoPickup,

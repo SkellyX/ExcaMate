@@ -1,11 +1,12 @@
-package com.skelly.deepstash.mixin;
+package com.skelly.excamate.mixin;
 
-import com.skelly.deepstash.ExcaMate;
-import com.skelly.deepstash.ExcaMateMode;
-import com.skelly.deepstash.ExcaMateMiningRules;
-import com.skelly.deepstash.ExcaMateNetworking;
-import com.skelly.deepstash.ExcaMateXpCapture;
-import com.skelly.deepstash.config.ExcaMateConfig;
+import com.skelly.excamate.ExcaMate;
+import com.skelly.excamate.ExcaMateDropSweeper;
+import com.skelly.excamate.ExcaMateMode;
+import com.skelly.excamate.ExcaMateMiningRules;
+import com.skelly.excamate.ExcaMateNetworking;
+import com.skelly.excamate.ExcaMateXpCapture;
+import com.skelly.excamate.config.ExcaMateConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action;
@@ -13,7 +14,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerPlayerGameMode;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ItemStack;
@@ -41,8 +41,27 @@ import java.util.Set;
 
 @Mixin(ServerPlayerGameMode.class)
 public abstract class ServerPlayerGameModeMixin {
+    // Radius (in blocks) within which disconnected ore nodes of the same type are swept into the vein.
     private static final int ORE_STRAGGLER_SEARCH_RADIUS = 4;
+    // Matches the vanilla hunger cost for breaking one block (ServerPlayerGameMode#destroyBlock
+    // does not charge exhaustion itself in this version, so ExcaMate applies it manually).
     private static final float EXHAUSTION_PER_EXTRA_BLOCK = 0.005F;
+    // Max distance from the player at which vein-connected blocks may be mined.
+    // Prevents a vein from reaching blocks the player could not otherwise interact with.
+    private static final double VEIN_MAX_REACH = 6.0;
+    // Fixed pickup-sweep size for cascading plants (chorus, bamboo, sugar cane, etc.), anchored on
+    // the block the player actually broke. Generous enough to cover any vanilla structure of these
+    // types, since the real extent can't be measured after vanilla's own collapse has already run.
+    private static final double CASCADE_SWEEP_HORIZONTAL_RADIUS = 6.0;
+    private static final double CASCADE_SWEEP_VERTICAL_RADIUS = 32.0;
+    // Vanilla cascades these structures one segment per tick, so the sweep needs to keep
+    // running for a couple of seconds after the break, not just once.
+    private static final int CASCADE_SWEEP_DURATION_TICKS = 40;
+
+    // Pairs the pos and state of the block that triggered ExcaMate so the RETURN inject can find them.
+    private record PendingBreak(@NotNull BlockPos pos, @NotNull BlockState state) {}
+    // Pairs the pos and face direction from handleBlockBreakAction for use by excavation mode.
+    private record LastHit(@NotNull BlockPos pos, @NotNull Direction direction) {}
 
     @Shadow protected @NotNull ServerLevel level;
 
@@ -55,14 +74,8 @@ public abstract class ServerPlayerGameModeMixin {
     private boolean excamate$breakingBlock;
     private boolean excamate$capturingXp;
     private boolean excamate$processingExcaMateBreak;
-    @Nullable
-    private BlockPos excamate$pendingPos;
-    @Nullable
-    private BlockState excamate$pendingState;
-    @Nullable
-    private BlockPos excamate$lastActionPos;
-    @Nullable
-    private Direction excamate$lastHitDirection;
+    @Nullable private PendingBreak excamate$pendingBreak;
+    @Nullable private LastHit excamate$lastHit;
 
     @Inject(method = "handleBlockBreakAction", at = @At("HEAD"))
     private void excamate$captureHitDirection(
@@ -73,8 +86,7 @@ public abstract class ServerPlayerGameModeMixin {
         int sequence,
         CallbackInfo ci
     ) {
-        excamate$lastActionPos = pos;
-        excamate$lastHitDirection = direction;
+        excamate$lastHit = new LastHit(pos, direction);
     }
 
     @Inject(method = "destroyBlock", at = @At("HEAD"))
@@ -87,8 +99,7 @@ public abstract class ServerPlayerGameModeMixin {
         @NotNull BlockState state = level.getBlockState(pos);
         if (state.isAir() || !excamate$canMineWithExcaMate(pos, state, config)) return;
 
-        excamate$pendingPos = pos;
-        excamate$pendingState = state;
+        excamate$pendingBreak = new PendingBreak(pos, state);
         excamate$processingExcaMateBreak = true;
 
         if (config.autoCollectXp) {
@@ -102,10 +113,9 @@ public abstract class ServerPlayerGameModeMixin {
     @Inject(method = "destroyBlock", at = @At("RETURN"))
     private void excamate$destroyAndStash(@NotNull BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
         if (!cir.getReturnValue()) {
-            BlockPos pendingPos = excamate$pendingPos;
-            if (pendingPos != null && pendingPos.equals(pos)) {
-                excamate$pendingPos = null;
-                excamate$pendingState = null;
+            PendingBreak pending = excamate$pendingBreak;
+            if (pending != null && pending.pos().equals(pos)) {
+                excamate$pendingBreak = null;
                 excamate$clearHitDirection(pos);
                 excamate$processingExcaMateBreak = false;
                 excamate$stopXpCapture();
@@ -115,23 +125,22 @@ public abstract class ServerPlayerGameModeMixin {
         ExcaMateConfig config = ExcaMate.config;
         if (excamate$breakingBlock || config == null) return;
         if (isCreative()) return;
-        BlockState brokenState = excamate$pendingState;
-        BlockPos pendingPos = excamate$pendingPos;
-        if (pendingPos == null || !pendingPos.equals(pos) || brokenState == null) {
+        PendingBreak pending = excamate$pendingBreak;
+        if (pending == null || !pending.pos().equals(pos)) {
             excamate$processingExcaMateBreak = false;
             excamate$stopXpCapture();
             return;
         }
 
-        excamate$pendingPos = null;
-        excamate$pendingState = null;
+        excamate$pendingBreak = null;
+        BlockState brokenState = pending.state();
 
         int capturedXp;
         try {
-            if (excamate$shouldAutoPickupExcaMateDrops(brokenState)) {
-                excamate$stashDropsNear(pos);
-            }
+            excamate$tryReplantAfterBreak(pos, brokenState);
 
+            // excamate$mineExcaMateBlocks does its own post-batch pickup sweep (covering
+            // this block plus any extras), gated the same way shouldAutoPickupExcaMateDrops is.
             if (excamate$isVeinMiningActive()) {
                 excamate$mineExcaMateBlocks(pos, brokenState);
             }
@@ -149,25 +158,50 @@ public abstract class ServerPlayerGameModeMixin {
     }
 
     private void excamate$mineExcaMateBlocks(@NotNull BlockPos startPos, @NotNull BlockState startState) {
-        int maxBlocks = Math.min(excamate$getConfiguredExtraBlockLimit(ExcaMateNetworking.getMode(player)), excamate$getSafeExtraToolUses());
-        if (maxBlocks <= 0) return;
+        // Tracks every position broken this swing (the initial block plus any extras) so a single
+        // pickup sweep can cover the whole worked area afterward. Some plants (chorus, bamboo, sugar
+        // cane) cascade-break and drop items away from where they were actually targeted, so sweeping
+        // only around each individually-broken position misses those scattered drops.
+        List<@NotNull BlockPos> minedPositions = new ArrayList<>();
+        minedPositions.add(startPos);
 
-        if (ExcaMateNetworking.getMode(player) == ExcaMateMode.BRANCH_1X2) {
-            excamate$mineBranchTunnel(startState, maxBlocks);
-            return;
+        ExcaMateMode mode = ExcaMateNetworking.getMode(player);
+        int maxBlocks = Math.min(excamate$getConfiguredExtraBlockLimit(mode), excamate$getSafeExtraToolUses());
+
+        if (maxBlocks > 0) {
+            // Branch mode breaks blocks step-by-step so it can place torches after each pair;
+            // Vein and Excavate collect all positions first then break them in one pass.
+            if (mode == ExcaMateMode.BRANCH_1X2) {
+                excamate$mineBranchTunnel(startState, maxBlocks, minedPositions);
+            } else {
+                // The selected mode is universal; strict tool checks decide which blocks each held tool may include.
+                List<@NotNull BlockPos> blocksToMine = switch (mode) {
+                    case VEIN -> excamate$collectVeinModeBlocks(startPos, startState, maxBlocks);
+                    case EXCAVATE_3X3 -> excamate$collectExcavationVolume(startPos, startState, maxBlocks);
+                    default -> List.of();
+                };
+                excamate$breakCollectedBlocks(blocksToMine, minedPositions);
+            }
         }
 
-        List<@NotNull BlockPos> blocksToMine = excamate$collectBlocksForMode(startPos, startState, maxBlocks);
-        excamate$breakCollectedBlocks(blocksToMine);
+        if (excamate$shouldAutoPickupExcaMateDrops(startState)) {
+            if (ExcaMateMiningRules.isCascadingPlantBlock(startState)) {
+                // Vanilla schedules each cascading segment's destruction a tick after the one
+                // below/beside it breaks, so a tall structure collapses one link per tick rather
+                // than all at once. A single sweep right now only catches whatever has already
+                // dropped; ExcaMateDropSweeper re-sweeps the same area for the next couple of
+                // seconds so later waves of the cascade get picked up too.
+                AABB sweepArea = excamate$cascadeSweepArea(startPos);
+                excamate$stashDropsIn(sweepArea);
+                ExcaMateDropSweeper.schedule(player, sweepArea, CASCADE_SWEEP_DURATION_TICKS);
+            } else {
+                excamate$stashDropsAround(minedPositions);
+            }
+        }
     }
 
-    private List<@NotNull BlockPos> excamate$collectBlocksForMode(@NotNull BlockPos startPos, @NotNull BlockState startState, int maxBlocks) {
-        // The selected mode is universal; strict tool checks decide which blocks each held tool may include.
-        return switch (ExcaMateNetworking.getMode(player)) {
-            case VEIN -> excamate$collectVeinModeBlocks(startPos, startState, maxBlocks);
-            case BRANCH_1X2 -> excamate$collectBranchTunnel(startPos, startState, maxBlocks);
-            case EXCAVATE_3X3 -> excamate$collectExcavationVolume(startPos, startState, maxBlocks);
-        };
+    private static @NotNull AABB excamate$cascadeSweepArea(@NotNull BlockPos startPos) {
+        return new AABB(startPos).inflate(CASCADE_SWEEP_HORIZONTAL_RADIUS, CASCADE_SWEEP_VERTICAL_RADIUS, CASCADE_SWEEP_HORIZONTAL_RADIUS);
     }
 
     private List<@NotNull BlockPos> excamate$collectVeinModeBlocks(@NotNull BlockPos startPos, @NotNull BlockState startState, int maxBlocks) {
@@ -179,28 +213,7 @@ public abstract class ServerPlayerGameModeMixin {
         return blocksToMine;
     }
 
-    private List<@NotNull BlockPos> excamate$collectBranchTunnel(@NotNull BlockPos startPos, @NotNull BlockState startState, int maxBlocks) {
-        List<@NotNull BlockPos> blocksToMine = new ArrayList<>();
-        Direction facing = player.getDirection();
-        BlockPos playerFeet = player.blockPosition();
-
-        for (int step = 0; step <= maxBlocks && blocksToMine.size() < maxBlocks; step++) {
-            BlockPos lower = playerFeet.relative(facing, step);
-            if (excamate$isValidPatternBlock(lower, startState)) {
-                blocksToMine.add(lower);
-                if (blocksToMine.size() >= maxBlocks) break;
-            }
-
-            BlockPos upper = lower.above();
-            if (excamate$isValidPatternBlock(upper, startState)) {
-                blocksToMine.add(upper);
-            }
-        }
-
-        return blocksToMine;
-    }
-
-    private void excamate$mineBranchTunnel(@NotNull BlockState startState, int maxBlocks) {
+    private void excamate$mineBranchTunnel(@NotNull BlockState startState, int maxBlocks, @NotNull List<@NotNull BlockPos> minedPositions) {
         Direction facing = player.getDirection();
         BlockPos playerFeet = player.blockPosition();
         int extraBlocksBroken = 0;
@@ -213,6 +226,7 @@ public abstract class ServerPlayerGameModeMixin {
                 && excamate$getSafeExtraToolUses() > 0
                 && excamate$isValidPatternBlock(lower, startState)
                 && excamate$breakExcaMateBlock(lower)) {
+                minedPositions.add(lower);
                 extraBlocksBroken++;
                 brokeBlockThisStep = true;
             }
@@ -222,6 +236,7 @@ public abstract class ServerPlayerGameModeMixin {
                 && excamate$getSafeExtraToolUses() > 0
                 && excamate$isValidPatternBlock(upper, startState)
                 && excamate$breakExcaMateBlock(upper)) {
+                minedPositions.add(upper);
                 extraBlocksBroken++;
                 brokeBlockThisStep = true;
             }
@@ -260,19 +275,18 @@ public abstract class ServerPlayerGameModeMixin {
     }
 
     private Direction excamate$getHitDirectionFor(@NotNull BlockPos startPos) {
-        BlockPos lastActionPos = excamate$lastActionPos;
-        if (lastActionPos != null && lastActionPos.equals(startPos) && excamate$lastHitDirection != null) {
-            return excamate$lastHitDirection;
+        LastHit lastHit = excamate$lastHit;
+        if (lastHit != null && lastHit.pos().equals(startPos)) {
+            return lastHit.direction();
         }
 
         return player.getDirection();
     }
 
     private void excamate$clearHitDirection(@NotNull BlockPos pos) {
-        BlockPos lastActionPos = excamate$lastActionPos;
-        if (lastActionPos != null && lastActionPos.equals(pos)) {
-            excamate$lastActionPos = null;
-            excamate$lastHitDirection = null;
+        LastHit lastHit = excamate$lastHit;
+        if (lastHit != null && lastHit.pos().equals(pos)) {
+            excamate$lastHit = null;
         }
     }
 
@@ -284,7 +298,7 @@ public abstract class ServerPlayerGameModeMixin {
         };
     }
 
-    private void excamate$breakCollectedBlocks(List<@NotNull BlockPos> blocksToMine) {
+    private void excamate$breakCollectedBlocks(List<@NotNull BlockPos> blocksToMine, @NotNull List<@NotNull BlockPos> minedPositions) {
         int extraBlocksBroken = 0;
 
         // Extra blocks still go through vanilla destroyBlock/playerDestroy so drops, Fortune,
@@ -294,6 +308,7 @@ public abstract class ServerPlayerGameModeMixin {
             if (!excamate$isVeinMiningActive() || excamate$getSafeExtraToolUses() <= 0) break;
 
             if (excamate$breakExcaMateBlock(blockPos)) {
+                minedPositions.add(blockPos);
                 extraBlocksBroken++;
             }
         }
@@ -312,8 +327,8 @@ public abstract class ServerPlayerGameModeMixin {
         excamate$processingExcaMateBreak = true;
         try {
             boolean destroyed = destroyBlock(blockPos);
-            if (destroyed && excamate$shouldAutoPickupExcaMateDrops(state)) {
-                excamate$stashDropsNear(blockPos);
+            if (destroyed) {
+                excamate$tryReplantAfterBreak(blockPos, state);
             }
 
             return destroyed;
@@ -394,7 +409,9 @@ public abstract class ServerPlayerGameModeMixin {
         return excamate$isSameVeinType(startState, state)
             && !state.isAir()
             && excamate$canMineWithExcaMate(pos, state)
-            && (ExcaMateMiningRules.isWoodBlock(startState) || excamate$isInMiningRange(pos));
+            && (ExcaMateMiningRules.isWoodBlock(startState)
+                || ExcaMateMiningRules.isTallPlantBlock(startState)
+                || excamate$isInMiningRange(pos));
     }
 
     private boolean excamate$isValidPatternBlock(@NotNull BlockPos pos, @NotNull BlockState startState) {
@@ -415,19 +432,15 @@ public abstract class ServerPlayerGameModeMixin {
         @NotNull BlockState state,
         @NotNull ExcaMateConfig config
     ) {
-        return excamate$isSafeExcaMateBlock(pos, state)
+        return excamate$isNeverMineableBlock(state)
             && ExcaMateMiningRules.canMineWithExcaMate(player, state, config);
     }
 
-    private boolean excamate$isSafeExcaMateBlock(@NotNull BlockPos pos, @NotNull BlockState state) {
-        if (level.getBlockEntity(pos) != null) return false;
-
-        return !state.is(Blocks.CHEST)
-            && !state.is(Blocks.TRAPPED_CHEST)
-            && !state.is(Blocks.BARREL)
-            && !state.is(BlockTags.SHULKER_BOXES)
-            && !state.is(Blocks.ENDER_CHEST)
-            && !state.is(Blocks.BEDROCK)
+    // Blocks that can never be vein-mined regardless of the allow list.
+    // Functional/container blocks (chests, barrels, etc.) are not listed here;
+    // they are simply absent from the default block lists and require explicit allow-listing.
+    private boolean excamate$isNeverMineableBlock(@NotNull BlockState state) {
+        return !state.is(Blocks.BEDROCK)
             && !state.is(Blocks.END_PORTAL_FRAME)
             && !state.is(Blocks.COMMAND_BLOCK)
             && !state.is(Blocks.CHAIN_COMMAND_BLOCK)
@@ -455,7 +468,7 @@ public abstract class ServerPlayerGameModeMixin {
         double dx = player.getX() - (pos.getX() + 0.5);
         double dy = player.getY() - (pos.getY() + 0.5);
         double dz = player.getZ() - (pos.getZ() + 0.5);
-        return Math.sqrt(dx * dx + dy * dy + dz * dz) <= 6.0;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz) <= VEIN_MAX_REACH;
     }
 
     private int excamate$getSafeExtraToolUses() {
@@ -510,6 +523,41 @@ public abstract class ServerPlayerGameModeMixin {
     }
 
     @Nullable
+    private Block excamate$getCropBlockForSeed(@NotNull ItemStack stack) {
+        if (stack.is(Items.WHEAT_SEEDS)) return Blocks.WHEAT;
+        if (stack.is(Items.CARROT)) return Blocks.CARROTS;
+        if (stack.is(Items.POTATO)) return Blocks.POTATOES;
+        if (stack.is(Items.BEETROOT_SEEDS)) return Blocks.BEETROOTS;
+        if (stack.is(Items.NETHER_WART)) return Blocks.NETHER_WART;
+        if (stack.is(Items.TORCHFLOWER_SEEDS)) return Blocks.TORCHFLOWER_CROP;
+        if (stack.is(Items.PITCHER_POD)) return Blocks.PITCHER_CROP;
+        return null;
+    }
+
+    private void excamate$tryReplantAfterBreak(@NotNull BlockPos pos, @NotNull BlockState brokenState) {
+        ExcaMateConfig config = ExcaMate.config;
+        if (config == null || !config.autoReplantCrops) return;
+        if (!ExcaMateMiningRules.isPlantBlock(brokenState)) return;
+
+        ItemStack offhandStack = player.getOffhandItem();
+        Block cropBlock = excamate$getCropBlockForSeed(offhandStack);
+        if (cropBlock == null) return;
+
+        BlockState cropState = cropBlock.defaultBlockState();
+        if (!level.getBlockState(pos).isAir()) return;
+        if (!cropState.canSurvive(level, pos)) return;
+        if (!level.setBlock(pos, cropState, Block.UPDATE_ALL)) return;
+
+        SoundType soundType = cropState.getSoundType();
+        level.playSound(null, pos, soundType.getPlaceSound(), SoundSource.BLOCKS,
+            (soundType.getVolume() + 1.0F) / 2.0F, soundType.getPitch() * 0.8F);
+
+        if (!isCreative()) {
+            offhandStack.shrink(1);
+        }
+    }
+
+    @Nullable
     private Block excamate$getTorchBlock(@NotNull ItemStack stack) {
         if (stack.is(Items.TORCH)) return Blocks.TORCH;
         if (stack.is(Items.SOUL_TORCH)) return Blocks.SOUL_TORCH;
@@ -549,9 +597,23 @@ public abstract class ServerPlayerGameModeMixin {
         return ExcaMateXpCapture.stop();
     }
 
-    private void excamate$stashDropsNear(@NotNull BlockPos pos) {
-        AABB pickupArea = new AABB(pos).inflate(1.0);
-        List<@NotNull ItemEntity> itemEntities = level.getEntitiesOfClass(ItemEntity.class, pickupArea);
+    // Sweeps one bounding box covering every position broken this swing, rather than a separate
+    // 1-block box per position. Plants like chorus, bamboo, and sugar cane cascade-break when their
+    // support is removed, dropping items at the cascaded block's own position — which may be well
+    // away from any position ExcaMate actually targeted — so a wide single sweep is needed to catch them.
+    private void excamate$stashDropsAround(@NotNull List<@NotNull BlockPos> positions) {
+        if (positions.isEmpty()) return;
+
+        AABB pickupArea = new AABB(positions.get(0));
+        for (int i = 1; i < positions.size(); i++) {
+            pickupArea = pickupArea.minmax(new AABB(positions.get(i)));
+        }
+
+        excamate$stashDropsIn(pickupArea.inflate(1.0));
+    }
+
+    private void excamate$stashDropsIn(@NotNull AABB area) {
+        List<@NotNull ItemEntity> itemEntities = level.getEntitiesOfClass(ItemEntity.class, area);
 
         for (ItemEntity itemEntity : itemEntities) {
             ItemStack stack = itemEntity.getItem();

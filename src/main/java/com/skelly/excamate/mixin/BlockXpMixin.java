@@ -1,6 +1,6 @@
-package com.skelly.deepstash.mixin;
+package com.skelly.excamate.mixin;
 
-import com.skelly.deepstash.ExcaMateXpCapture;
+import com.skelly.excamate.ExcaMateXpCapture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;

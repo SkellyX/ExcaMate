@@ -1,4 +1,4 @@
-package com.skelly.deepstash;
+package com.skelly.excamate;
 
 public final class ExcaMateXpCapture {
     private static final ThreadLocal<Integer> CAPTURED_XP = new ThreadLocal<>();
